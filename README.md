@@ -6,3 +6,5 @@ uv add  streamlit  opencv-python  numpy  Pillow
 needed runtime.txt in the streamlit cloud setup.
 
 deployment:  https://photosketch-am-d153.streamlit.app/
+
+photosketch-am-d153
