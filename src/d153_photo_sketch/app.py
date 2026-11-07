@@ -5,7 +5,7 @@ from PIL import Image
 import io
 
 # ----------------------------------------------------
-# Page Configuration
+# PAGE CONFIG
 # ----------------------------------------------------
 st.set_page_config(
     page_title="Photo to Pencil Sketch",
@@ -14,34 +14,38 @@ st.set_page_config(
 )
 
 # ----------------------------------------------------
-# Custom CSS
+# CUSTOM CSS
 # ----------------------------------------------------
-st.markdown("""
-<style>
+st.markdown(
+    """
+    <style>
 
-.stApp {
-    background-color: #f4f6f8;
-}
+    .stApp {
+        background-color: #f5f7ff;
+    }
 
-.main-title {
-    text-align: center;
-    color: #2E4053;
-    font-size: 42px;
-    font-weight: bold;
-}
+    .main-title {
+        text-align: center;
+        color: orangered;
+        font-size: 42px;
+        font-weight: 700;
+        margin-bottom: 0px;
+    }
 
-.sub-title {
-    text-align: center;
-    color: #566573;
-    font-size: 18px;
-    margin-bottom: 25px;
-}
+    .sub-title {
+        text-align: center;
+        color: #5d6d7e;
+        font-size: 18px;
+        margin-bottom: 30px;
+    }
 
-</style>
-""", unsafe_allow_html=True)
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # ----------------------------------------------------
-# Header
+# HEADER
 # ----------------------------------------------------
 st.markdown(
     '<p class="main-title">✏️ Photo to Pencil Sketch</p>',
@@ -49,68 +53,92 @@ st.markdown(
 )
 
 st.markdown(
-    '<p class="sub-title">Upload a photo and download a beautiful pencil sketch version.</p>',
+    '<p class="sub-title">Upload a photo, adjust the sketch effect, and download the result.</p>',
     unsafe_allow_html=True
 )
 
 # ----------------------------------------------------
-# Sketch Function
+# SIDEBAR
 # ----------------------------------------------------
-def generate_sketch(image_array, blur_size):
+st.sidebar.header("Sketch Settings")
 
-    # Convert to grayscale
-    gray_img = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+blur_size = st.sidebar.slider(
+    "Pencil Softness",
+    min_value=3,
+    max_value=101,
+    value=31,
+    step=2,
+    help="Higher values create softer pencil strokes."
+)
 
-    # Improve contrast
-    gray_img = cv2.equalizeHist(gray_img)
+sketch_strength = st.sidebar.slider(
+    "Sketch Intensity",
+    min_value=100,
+    max_value=500,
+    value=256,
+    step=10,
+    help="Higher values create darker and stronger sketch effects."
+)
 
-    # Invert image
-    inverted = cv2.bitwise_not(gray_img)
+# ----------------------------------------------------
+# FUNCTION
+# ----------------------------------------------------
+def generate_sketch(image_array, blur_size, sketch_strength):
+    """
+    Convert image to pencil sketch.
+    """
 
-    # Blur inverted image
+    # Grayscale
+    gray = cv2.cvtColor(
+        image_array,
+        cv2.COLOR_RGB2GRAY
+    )
+
+    # Enhance contrast
+    gray = cv2.equalizeHist(gray)
+
+    # Invert
+    inverted = cv2.bitwise_not(gray)
+
+    # Blur
     blur = cv2.GaussianBlur(
         inverted,
         (blur_size, blur_size),
-        sigmaX=0
+        0
     )
 
     # Invert blurred image
     inverted_blur = cv2.bitwise_not(blur)
 
-    # Create sketch
+    # Pencil sketch
     sketch = cv2.divide(
-        gray_img,
+        gray,
         inverted_blur,
-        scale=256.0
+        scale=sketch_strength
+    )
+
+    # Extra contrast adjustment based on intensity slider
+    alpha = sketch_strength / 256.0
+
+    sketch = cv2.convertScaleAbs(
+        sketch,
+        alpha=alpha,
+        beta=0
     )
 
     return sketch
 
 
 # ----------------------------------------------------
-# Sidebar Controls
-# ----------------------------------------------------
-st.sidebar.header("Settings")
-
-blur_size = st.sidebar.slider(
-    "Sketch Intensity",
-    min_value=5,
-    max_value=51,
-    value=21,
-    step=2,
-    help="Higher value = softer pencil effect"
-)
-
-# ----------------------------------------------------
-# File Upload
+# FILE UPLOAD
 # ----------------------------------------------------
 uploaded_file = st.file_uploader(
-    "Upload Photo",
+    "Upload Image",
     type=["jpg", "jpeg", "png"]
 )
 
 # ----------------------------------------------------
-# Process Image
+# PROCESS IMAGE
 # ----------------------------------------------------
 if uploaded_file is not None:
 
@@ -121,32 +149,34 @@ if uploaded_file is not None:
 
         sketch = generate_sketch(
             image_np,
-            blur_size
+            blur_size,
+            sketch_strength
         )
 
-        # Display images
         col1, col2 = st.columns(2)
 
         with col1:
             st.subheader("Original Image")
             st.image(
                 image,
-                use_container_width=True
+                width="stretch"
             )
 
         with col2:
             st.subheader("Sketch Image")
             st.image(
                 sketch,
-                use_container_width=True
+                width="stretch"
             )
 
-        # Convert sketch to JPEG bytes
-        sketch_image = Image.fromarray(sketch)
+        # ----------------------------------------------------
+        # DOWNLOAD JPG
+        # ----------------------------------------------------
+        sketch_pil = Image.fromarray(sketch)
 
         buffer = io.BytesIO()
 
-        sketch_image.save(
+        sketch_pil.save(
             buffer,
             format="JPEG",
             quality=100
@@ -161,11 +191,11 @@ if uploaded_file is not None:
             data=jpg_bytes,
             file_name="pencil_sketch.jpg",
             mime="image/jpeg",
-            use_container_width=True
+            width="stretch"
         )
 
     except Exception as e:
         st.error(f"Error processing image: {e}")
 
 else:
-    st.info("👆 Upload a JPG or PNG image to generate its sketch.")
+    st.info("👆 Upload a JPG or PNG image to begin.")
